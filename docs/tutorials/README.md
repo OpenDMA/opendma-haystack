@@ -25,3 +25,7 @@ For each tutorial, you might need to install additional packages.
 ## [Basic RAG](./01_basic_rag.md)
 Load documents from an ECM system through the OpenDMA abstraction, index them,
 and use them for question answering.
+
+## [Metadata-Aware Retrieval](./02_metadata_aware_retrieval.md)
+Use the additional information available in an ECM system to guide the information retrieval in order
+to improve retrieval [precision and recall](https://en.wikipedia.org/wiki/Precision_and_recall).

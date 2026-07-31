@@ -338,3 +338,12 @@ multi valued. §2.1 Scalar values The OpenDMA class architec...
 
 This is the basic RAG flow: documents are retrieved from the vector store, and
 the model generates an answer from the retrieved context.
+
+## Next
+
+In the next tutorial, [Metadata-Aware Retrieval](./02_metadata_aware_retrieval.md), we ingest
+data from a real ECM system: Alfresco.
+
+We observe how the quality of the RAG degrades after ingesting more information into
+the knowledge base. Additional information about the documents is used to guide retrieval and
+increase precision and recall.
