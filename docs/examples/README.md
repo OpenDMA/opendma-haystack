@@ -28,7 +28,7 @@ These examples demonstrate the basic usage of the Document Fetcher with sample
 content from this tutorial repository.
 
 Features of the Tutorial XML Repository are limited, but it allows us to
-explore the basic functionality of this LangChain integration without complex
+explore the basic functionality of this Haystack integration without complex
 setups.
 
 ### `01_basic_usage.py`
