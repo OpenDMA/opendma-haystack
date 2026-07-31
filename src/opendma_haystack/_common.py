@@ -6,9 +6,9 @@ import warnings
 from collections.abc import Callable
 from typing import Any
 
-from opendma.api import OdmaDataContentElement
+from opendma.api import OdmaDataContentElement, OdmaDocument
 
-MetadataFn = Callable[[Any], dict[str, Any]]
+MetadataFn = Callable[[OdmaDocument], dict[str, Any]]
 
 SCALAR_PROPERTY_TYPES = {
     "STRING",
@@ -30,7 +30,7 @@ def normalize_mime_type(mime_type: str | None) -> str | None:
 
 
 def extract_metadata(
-    document: Any,
+    document: OdmaDocument,
     repository_id: str,
     metadata_fn: MetadataFn | None = None,
 ) -> dict[str, Any]:

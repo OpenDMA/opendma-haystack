@@ -6,7 +6,14 @@ from typing import Any
 
 from haystack import Document, component
 from haystack.dataclasses import ByteStream
-from opendma.api import OdmaDataContentElement, OdmaDocument, OdmaFolder, OdmaId, OdmaQName
+from opendma.api import (
+    OdmaDataContentElement,
+    OdmaDocument,
+    OdmaFolder,
+    OdmaId,
+    OdmaObject,
+    OdmaQName,
+)
 from opendma.remote import connect
 
 from opendma_haystack._common import (
@@ -79,13 +86,13 @@ class OpenDMAFetcher:
     def _fetch_target(
         self, session: Any, repository_id: str, document_id: str
     ) -> ByteStream | None:
-        obj = session.get_object(OdmaId(repository_id), OdmaId(document_id), None)
+        obj: OdmaObject = session.get_object(OdmaId(repository_id), OdmaId(document_id), None)
         if not isinstance(obj, OdmaDocument):
             raise TypeError(f"OpenDMA object {document_id!r} is not a document")
 
         return self._fetch_document(obj, repository_id)
 
-    def _fetch_document(self, document: Any, repository_id: str) -> ByteStream | None:
+    def _fetch_document(self, document: OdmaDocument, repository_id: str) -> ByteStream | None:
         content_element = document.get_primary_content_element()
         if content_element is None:
             return self._empty_stream_if_requested(document, repository_id, None)
@@ -112,7 +119,7 @@ class OpenDMAFetcher:
         folder_id: str,
         recurse_folders: bool,
     ) -> list[ByteStream]:
-        folder = session.get_object(OdmaId(repository_id), OdmaId(folder_id), None)
+        folder: OdmaObject = session.get_object(OdmaId(repository_id), OdmaId(folder_id), None)
         if not isinstance(folder, OdmaFolder):
             raise TypeError(f"OpenDMA object {folder_id!r} is not a folder")
 
@@ -135,7 +142,7 @@ class OpenDMAFetcher:
 
     def _empty_stream_if_requested(
         self,
-        document: Any,
+        document: OdmaDocument,
         repository_id: str,
         mime_type: str | None,
     ) -> ByteStream | None:
@@ -146,7 +153,7 @@ class OpenDMAFetcher:
 
     def _stream_metadata(
         self,
-        document: Any,
+        document: OdmaDocument,
         repository_id: str,
     ) -> dict[str, Any]:
         return extract_metadata(
