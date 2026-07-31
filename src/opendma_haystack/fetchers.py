@@ -14,9 +14,41 @@ from opendma_haystack._common import (
     extract_metadata,
     handle_error,
     normalize_mime_type,
-    resolve_target,
     validate_alfresco_site_name,
 )
+
+
+def _target_from_document(
+    document: Document, fallback_repository_id: str | None = None
+) -> tuple[str, str]:
+    """Resolve a Haystack Document into an OpenDMA fetch target."""
+    repository_id = document.meta.get("repository_id") or fallback_repository_id
+    document_id = document.meta.get("opendma_id")
+
+    if not isinstance(repository_id, str) or not repository_id.strip():
+        raise ValueError("Document target must provide meta['repository_id']")
+    if not isinstance(document_id, str) or not document_id.strip():
+        raise ValueError("Document target must provide meta['opendma_id']")
+
+    return repository_id, document_id
+
+
+def _target_from_string(document_id: str, repository_id: str | None) -> tuple[str, str]:
+    """Resolve a raw OpenDMA document ID string into an OpenDMA fetch target."""
+    if not document_id.strip():
+        raise ValueError("document ID target must not be empty")
+    if repository_id is None or not repository_id.strip():
+        raise ValueError("repository_id is required when targets contain raw document IDs")
+    return repository_id, document_id
+
+
+def _resolve_target(target: str | Document, repository_id: str | None = None) -> tuple[str, str]:
+    """Resolve a fetch target into repository and document identifiers."""
+    if isinstance(target, Document):
+        return _target_from_document(target, repository_id)
+    if isinstance(target, str):
+        return _target_from_string(target, repository_id)
+    raise TypeError("targets must contain raw document IDs or Haystack Document objects")
 
 
 @component
@@ -56,22 +88,21 @@ class OpenDMAFetcher:
     def _fetch_document(self, document: Any, repository_id: str) -> ByteStream | None:
         content_element = document.get_primary_content_element()
         if content_element is None:
-            return self._empty_stream_if_requested(document, repository_id, None, None)
+            return self._empty_stream_if_requested(document, repository_id, None)
 
         mime_type = normalize_mime_type(content_element.get_content_type())
         if not isinstance(content_element, OdmaDataContentElement):
-            return self._empty_stream_if_requested(document, repository_id, mime_type, None)
+            return self._empty_stream_if_requested(document, repository_id, mime_type)
 
-        file_name = content_element.get_file_name()
         content = content_element.get_content()
         if content is None:
-            return self._empty_stream_if_requested(document, repository_id, mime_type, file_name)
+            return self._empty_stream_if_requested(document, repository_id, mime_type)
 
         stream = content.get_stream()
         if stream is None:
-            return self._empty_stream_if_requested(document, repository_id, mime_type, file_name)
+            return self._empty_stream_if_requested(document, repository_id, mime_type)
 
-        metadata = self._stream_metadata(document, repository_id, mime_type, file_name)
+        metadata = self._stream_metadata(document, repository_id)
         return ByteStream(data=stream.read(), meta=metadata, mime_type=mime_type)
 
     def _fetch_folder(
@@ -107,25 +138,20 @@ class OpenDMAFetcher:
         document: Any,
         repository_id: str,
         mime_type: str | None,
-        file_name: str | None,
     ) -> ByteStream | None:
         if not self.include_no_content:
             return None
-        metadata = self._stream_metadata(document, repository_id, mime_type, file_name)
+        metadata = self._stream_metadata(document, repository_id)
         return ByteStream(data=b"", meta=metadata, mime_type=mime_type)
 
     def _stream_metadata(
         self,
         document: Any,
         repository_id: str,
-        mime_type: str | None,
-        file_name: str | None,
     ) -> dict[str, Any]:
         return extract_metadata(
             document=document,
             repository_id=repository_id,
-            mime_type=mime_type,
-            file_name=file_name,
             metadata_fn=self.metadata_fn,
         )
 
@@ -154,7 +180,7 @@ class OpenDMAFetcher:
         try:
             for raw_target in targets or []:
                 try:
-                    target_repository_id, target_document_id = resolve_target(
+                    target_repository_id, target_document_id = _resolve_target(
                         raw_target, effective_repository_id
                     )
                     stream = self._fetch_target(session, target_repository_id, target_document_id)
@@ -296,7 +322,7 @@ class AlfrescoFetcher(OpenDMAFetcher):
         try:
             for raw_target in targets or []:
                 try:
-                    target_repository_id, target_document_id = resolve_target(
+                    target_repository_id, target_document_id = _resolve_target(
                         raw_target, effective_repository_id
                     )
                     stream = self._fetch_target(session, target_repository_id, target_document_id)

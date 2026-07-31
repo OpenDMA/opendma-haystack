@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from haystack import Document
 
 from opendma_haystack import AlfrescoFetcher, OpenDMAFetcher
+from opendma_haystack.fetchers import _resolve_target
 
 
 def test_init_stores_options() -> None:
@@ -35,6 +37,20 @@ def test_run_requires_repository_id_for_folder_ids() -> None:
 
     with pytest.raises(ValueError, match="repository_id is required"):
         fetcher.run(folder_ids=["folder"])
+
+
+def test_resolve_raw_target_requires_repository_id() -> None:
+    with pytest.raises(ValueError, match="repository_id is required"):
+        _resolve_target("document-1")
+
+
+def test_resolve_document_target_uses_metadata() -> None:
+    repository_id, document_id = _resolve_target(
+        Document(meta={"repository_id": "repo", "opendma_id": "document-1"}),
+    )
+
+    assert repository_id == "repo"
+    assert document_id == "document-1"
 
 
 def test_alfresco_fetcher_defaults_repository_id() -> None:
