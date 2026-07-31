@@ -11,7 +11,9 @@ dependencies = [
 
 [project.optional-dependencies]
 examples = [
+    "docling-haystack>=1.0.0",
     "pypdf>=4",
+    "trafilatura>=1.8",
 ]
 
 [build-system]

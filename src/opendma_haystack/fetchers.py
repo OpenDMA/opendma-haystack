@@ -6,7 +6,7 @@ from typing import Any
 
 from haystack import Document, component
 from haystack.dataclasses import ByteStream
-from opendma.api import OdmaDataContentElement, OdmaDocument, OdmaFolder, OdmaId
+from opendma.api import OdmaDataContentElement, OdmaDocument, OdmaFolder, OdmaId, OdmaQName
 from opendma.remote import connect
 
 from opendma_haystack._common import (
@@ -15,6 +15,7 @@ from opendma_haystack._common import (
     handle_error,
     normalize_mime_type,
     resolve_target,
+    validate_alfresco_site_name,
 )
 
 
@@ -187,6 +188,161 @@ class OpenDMAFetcher:
                         self.warn_on_error,
                     )
                     continue
+        finally:
+            session.close()
+
+        return {"streams": streams}
+
+
+class AlfrescoFetcher(OpenDMAFetcher):
+    """Fetch OpenDMA document content from Alfresco, including whole sites."""
+
+    def __init__(
+        self,
+        endpoint: str,
+        username: str | None = None,
+        password: str | None = None,
+        repository_id: str = "Alfresco",
+        sites: list[str] | None = None,
+        include_no_content: bool = False,
+        raise_on_error: bool = True,
+        warn_on_error: bool = True,
+        metadata_fn: MetadataFn | None = None,
+    ) -> None:
+        """Initialize the Alfresco fetcher."""
+        self._validate_sites(sites)
+        super().__init__(
+            endpoint=endpoint,
+            username=username,
+            password=password,
+            repository_id=repository_id,
+            include_no_content=include_no_content,
+            raise_on_error=raise_on_error,
+            warn_on_error=warn_on_error,
+            metadata_fn=metadata_fn,
+        )
+        self.sites = sites
+
+    @staticmethod
+    def _validate_sites(sites: list[str] | None) -> None:
+        if sites is not None:
+            for site in sites:
+                validate_alfresco_site_name(site)
+
+    def _fetch_sites(
+        self,
+        session: Any,
+        repository_id: str,
+        sites: list[str],
+    ) -> list[ByteStream]:
+        query_parts = [f'=cm:name:"{site}"' for site in sites]
+        afts_query = 'TYPE:"st:site" AND (' + " OR ".join(query_parts) + ")"
+        search_result = session.search(
+            OdmaId(repository_id),
+            OdmaQName.from_string("alfresco:afts"),
+            afts_query,
+        )
+
+        streams: list[ByteStream] = []
+        for site in search_result.get_objects():
+            if not isinstance(site, OdmaFolder):
+                continue
+            for subfolder in site.get_sub_folders():
+                folders_to_process = [subfolder]
+                while folders_to_process:
+                    current_folder = folders_to_process.pop()
+                    for containee in current_folder.get_containees():
+                        if not isinstance(containee, OdmaDocument):
+                            continue
+                        stream = self._fetch_document(containee, repository_id)
+                        if stream is not None:
+                            streams.append(stream)
+                    folders_to_process.extend(current_folder.get_sub_folders())
+
+        return streams
+
+    @component.output_types(streams=list[ByteStream])
+    def run(
+        self,
+        targets: list[str | Document] | None = None,
+        repository_id: str | None = None,
+        folder_ids: list[str] | None = None,
+        recurse_folders: bool = False,
+        sites: list[str] | None = None,
+    ) -> dict[str, list[ByteStream]]:
+        """Fetch full content for document targets, folders, or Alfresco sites."""
+        effective_repository_id = repository_id or self.repository_id
+        effective_sites = sites if sites is not None else self.sites
+        self._validate_sites(effective_sites)
+
+        if not targets and not folder_ids and not effective_sites:
+            raise ValueError("Must provide at least one of targets, folder_ids, or sites")
+        if folder_ids and (effective_repository_id is None or not effective_repository_id.strip()):
+            raise ValueError("repository_id is required when folder_ids are provided")
+        if effective_sites and (
+            effective_repository_id is None or not effective_repository_id.strip()
+        ):
+            raise ValueError("repository_id is required when sites are provided")
+        if effective_repository_id is None:
+            effective_repository_id = ""
+
+        session = connect(
+            endpoint=self.endpoint,
+            username=self.username,
+            password=self.password,
+        )
+        streams: list[ByteStream] = []
+
+        try:
+            for raw_target in targets or []:
+                try:
+                    target_repository_id, target_document_id = resolve_target(
+                        raw_target, effective_repository_id
+                    )
+                    stream = self._fetch_target(session, target_repository_id, target_document_id)
+                except Exception as exc:
+                    handle_error(
+                        "AlfrescoFetcher failed to fetch target",
+                        exc,
+                        self.raise_on_error,
+                        self.warn_on_error,
+                    )
+                    continue
+
+                if stream is not None:
+                    streams.append(stream)
+
+            for folder_id in folder_ids or []:
+                try:
+                    streams.extend(
+                        self._fetch_folder(
+                            session=session,
+                            repository_id=effective_repository_id,
+                            folder_id=folder_id,
+                            recurse_folders=recurse_folders,
+                        )
+                    )
+                except Exception as exc:
+                    handle_error(
+                        f"AlfrescoFetcher failed to fetch folder {folder_id}",
+                        exc,
+                        self.raise_on_error,
+                        self.warn_on_error,
+                    )
+                    continue
+
+            if effective_sites:
+                try:
+                    streams.extend(
+                        self._fetch_sites(session, effective_repository_id, effective_sites)
+                    )
+                except Exception as exc:
+                    handle_error(
+                        "AlfrescoFetcher failed to fetch sites",
+                        exc,
+                        self.raise_on_error,
+                        self.warn_on_error,
+                    )
         finally:
             session.close()
 
