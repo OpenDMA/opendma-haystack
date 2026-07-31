@@ -149,3 +149,23 @@ uv run --extra examples python docs/examples/11_alfresco_fetcher.py
 
 Looking at the `alfresco:Path` you can see that it includes information from the Wiki
 and Links as well, not just files from the Document Library.  
+
+### `12_alfresco_retriever.py`
+
+Performs a full-text search in the Alfresco "Sample: Web Site Design Project" site
+(`swsdp`) with `AlfrescoRetriever`, fetches the byte stream of all found files,
+and processes fetched files in a pipeline.
+
+Run with optional `example` dependencies:
+
+```bash
+uv run --extra examples python docs/examples/12_alfresco_retriever.py
+```
+
+## Notes
+
+Examples are intentionally small and print results to the console. They are meant
+to show component behavior, not full RAG pipelines.
+
+For package installation, API overview, and content handler guidance, see the
+project [README](../../README.md) and [documentation](../README.md).
