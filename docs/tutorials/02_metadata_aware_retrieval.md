@@ -17,8 +17,7 @@ information into account, like the Site where the document is stored.
 > [!NOTE]
 > The example in this tutorial is a bit brittle and might not always work.
 > The Alfresco Sample Site is full of "Lorem Ipsum" text making similarity
-> search challenging.  
-> Following tutorials present advanced techniques based on deepagents.
+> search challenging.
 
 ## Running Alfresco Community Edition
 
@@ -102,6 +101,9 @@ We use the same embeddings and document store as in the previous example:
 import getpass
 import os
 from haystack.document_stores.in_memory import InMemoryDocumentStore
+
+if not os.environ.get("OPENAI_API_KEY"):
+  os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
 
 EMBEDDING_MODEL = "text-embedding-3-large"
 CHAT_MODEL = "gpt-4o-mini"
@@ -649,7 +651,7 @@ Path: /Company Home/Sites/engineering/documentLibrary
 
 We can use this information to guide the retrieval process and ultimately get
 better results. This is achieved by adding an additional query analysis step in
-front of our rag pipeline.
+front of our RAG pipeline.
 
 This step looks at the initial user question and selects a Site where the file
 is most likely located. Additionally, this step generates an optimized query

@@ -48,7 +48,10 @@ import getpass
 import os
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 
-EMBEDDING_MODEL = "text-embedding-3-small"
+if not os.environ.get("OPENAI_API_KEY"):
+  os.environ["OPENAI_API_KEY"] = getpass.getpass("Enter API key for OpenAI: ")
+
+EMBEDDING_MODEL = "text-embedding-3-large"
 CHAT_MODEL = "gpt-4o-mini"
 
 document_store = InMemoryDocumentStore(embedding_similarity_function="cosine")
