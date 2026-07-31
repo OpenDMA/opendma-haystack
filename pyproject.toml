@@ -1,6 +1,6 @@
 [project]
 name = "opendma-haystack"
-version = "0.1.0"
+version = "0.2.0.dev1"
 description = "Haystack fetchers and retrievers for OpenDMA"
 license = "MIT"
 license-files = ["LICENSE"]
