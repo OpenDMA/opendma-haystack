@@ -97,7 +97,8 @@ This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 uv sync --all-extras
 uv run pytest
 uv run ruff check src tests
-uv run mypy src tests
+uv run mypy -p opendma_haystack
+uv run mypy --follow-imports=skip tests
 ```
 
 ## Related Projects

@@ -55,7 +55,8 @@ Lint, format, and type-check:
 ```bash
 uv run ruff check src tests
 uv run ruff format src tests
-uv run mypy src tests
+uv run mypy -p opendma_haystack
+uv run mypy --follow-imports=skip tests
 ```
 
 Build the package:
@@ -79,7 +80,8 @@ Prepare and publish a release:
 uv sync --all-extras --dev
 uv run pytest
 uv run ruff check src tests
-uv run mypy src tests
+uv run mypy -p opendma_haystack
+uv run mypy --follow-imports=skip tests
 uv build
 git tag 0.1.0
 git push origin 0.1.0
@@ -96,8 +98,9 @@ uv version --bump stable
 uv version --bump minor --bump dev
 ```
 
-Make sure to manually update `__version__` in `src/__init__.py` as it is not
-touched by `uv  version --bump`.
+Make sure to manually update `__version__` in
+`src/opendma_haystack/__init__.py` as it is not touched by
+`uv version --bump`.
 
 Use `uv publish --token` or the standard PyPI token environment variables
 according to the release environment.

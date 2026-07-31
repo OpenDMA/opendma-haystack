@@ -13,4 +13,5 @@ def tutorial_endpoint() -> str:
     endpoint = os.environ.get("OPENDMA_TUTORIAL_ENDPOINT")
     if not endpoint:
         pytest.skip("OPENDMA_TUTORIAL_ENDPOINT is not set")
+    assert endpoint
     return endpoint
