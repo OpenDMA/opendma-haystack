@@ -55,7 +55,8 @@ pipeline.connect("word_converter.documents", "joiner.documents")
 result = pipeline.run(
     {
         "fetcher": {"sites": ["swsdp"]},
-    }
+    },
+    include_outputs_from={"router"},
 )
 
 documents = result["joiner"]["documents"]
