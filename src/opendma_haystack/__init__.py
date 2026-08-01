@@ -11,7 +11,7 @@ from opendma_haystack.retrievers import (
     OpenDMARetriever,
 )
 
-__version__ = "0.2.0.dev1"
+__version__ = "0.2.0"
 
 __all__ = [
     "AlfrescoRetriever",
