@@ -29,3 +29,7 @@ and use them for question answering.
 ## [Metadata-Aware Retrieval](./02_metadata_aware_retrieval.md)
 Use the additional information available in an ECM system to guide the information retrieval in order
 to improve retrieval [precision and recall](https://en.wikipedia.org/wiki/Precision_and_recall).
+
+## [Agentic RAG](./03_agentic_rag.md)
+Agentic workflow with an orchestrator responsible for coordinating searches against
+the knowledge base. The workflow can run multiple searches until relevant context is found.
