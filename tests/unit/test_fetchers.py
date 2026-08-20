@@ -32,6 +32,28 @@ def test_run_requires_targets_or_folder_ids() -> None:
         fetcher.run()
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"targets": []},
+        {"folder_ids": []},
+        {"targets": [], "folder_ids": []},
+    ],
+)
+def test_run_accepts_explicit_empty_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+    kwargs: dict[str, list[str]],
+) -> None:
+    fetcher = OpenDMAFetcher(endpoint="http://localhost:8080/opendma", repository_id="repo")
+
+    def fail_connect(**_: object) -> object:
+        raise AssertionError("connect must not be called for explicit empty inputs")
+
+    monkeypatch.setattr("opendma_haystack.fetchers.connect", fail_connect)
+
+    assert fetcher.run(**kwargs) == {"streams": []}
+
+
 def test_run_requires_repository_id_for_folder_ids() -> None:
     fetcher = OpenDMAFetcher(endpoint="http://localhost:8080/opendma")
 
@@ -68,6 +90,29 @@ def test_alfresco_fetcher_requires_source() -> None:
 
     with pytest.raises(ValueError, match="Must provide at least one"):
         fetcher.run()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"targets": []},
+        {"folder_ids": []},
+        {"sites": []},
+        {"targets": [], "folder_ids": [], "sites": []},
+    ],
+)
+def test_alfresco_fetcher_accepts_explicit_empty_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+    kwargs: dict[str, list[str]],
+) -> None:
+    fetcher = AlfrescoFetcher(endpoint="http://localhost:8080/opendma")
+
+    def fail_connect(**_: object) -> object:
+        raise AssertionError("connect must not be called for explicit empty inputs")
+
+    monkeypatch.setattr("opendma_haystack.fetchers.connect", fail_connect)
+
+    assert fetcher.run(**kwargs) == {"streams": []}
 
 
 @pytest.mark.parametrize("character", ['"', "*", "\\", ">", "<", "?", "/", ":", "|"])

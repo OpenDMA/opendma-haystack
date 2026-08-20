@@ -172,8 +172,12 @@ class OpenDMAFetcher:
     ) -> dict[str, list[ByteStream]]:
         """Fetch full content for document targets or documents in folders."""
         effective_repository_id = repository_id or self.repository_id
-        if not targets and not folder_ids:
+        if targets is None and folder_ids is None:
             raise ValueError("Must provide at least one of targets or folder_ids")
+        if targets == [] and (folder_ids is None or folder_ids == []):
+            return {"streams": []}
+        if folder_ids == [] and (targets is None or targets == []):
+            return {"streams": []}
         if folder_ids and (effective_repository_id is None or not effective_repository_id.strip()):
             raise ValueError("repository_id is required when folder_ids are provided")
 
@@ -308,8 +312,14 @@ class AlfrescoFetcher(OpenDMAFetcher):
         effective_sites = sites if sites is not None else self.sites
         self._validate_sites(effective_sites)
 
-        if not targets and not folder_ids and not effective_sites:
+        if targets is None and folder_ids is None and effective_sites is None:
             raise ValueError("Must provide at least one of targets, folder_ids, or sites")
+        if (
+            (targets is None or targets == [])
+            and (folder_ids is None or folder_ids == [])
+            and (effective_sites is None or effective_sites == [])
+        ):
+            return {"streams": []}
         if folder_ids and (effective_repository_id is None or not effective_repository_id.strip()):
             raise ValueError("repository_id is required when folder_ids are provided")
         if effective_sites and (
