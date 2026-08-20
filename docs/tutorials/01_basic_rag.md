@@ -33,7 +33,7 @@ You can adjust the port if `8080` is already in use.
 Install Haystack, the OpenDMA integration, and the pypdf dependencies:
 
 ```bash
-pip install haystack-ai opendma-haystack pypdf
+pip install notebook "haystack-ai>=3,<4" "opendma-haystack>=0.2.0" pypdf
 ```
 
 ## Indexing Pipeline

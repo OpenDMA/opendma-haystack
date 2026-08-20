@@ -16,8 +16,9 @@ If you are using the jupyter extension in VS Code, make sure to use this virtual
 for your kernel.
 
 Next, install jupyter notebooks, haystack, pypdf, opendma and the opendma-haystack integration:
-```
-pip install notebook haystack-ai pypdf opendma-haystack
+
+```bash
+pip install notebook "haystack-ai>=3,<4" "opendma-haystack>=0.2.0" pypdf
 ```
 
 For each tutorial, you might need to install additional packages.
@@ -30,6 +31,6 @@ and use them for question answering.
 Use the additional information available in an ECM system to guide the information retrieval in order
 to improve retrieval [precision and recall](https://en.wikipedia.org/wiki/Precision_and_recall).
 
-## [Agentic RAG](./03_agentic_rag.md)
+## [Agentic RAG with Vector Store](./03_agentic_rag_vectorstore.md)
 Agentic workflow with an orchestrator responsible for coordinating searches against
 the knowledge base. The workflow can run multiple searches until relevant context is found.

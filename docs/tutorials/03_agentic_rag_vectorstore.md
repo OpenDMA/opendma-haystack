@@ -1,4 +1,4 @@
-# Agentic RAG
+# Agentic RAG with Vector Store
 
 This tutorial is a continuation of the previous [Metadata-Aware Retrieval](./02_metadata_aware_retrieval.md).
 
@@ -21,6 +21,12 @@ deciding for its next move:
 - Run the search globally against the entire knowledge base
 - Respond to the user
 
+> [!NOTE]
+> This tutorial uses live LLM calls. Even with `temperature=0`, hosted models can
+> change over time and may choose slightly different retrieval queries or produce
+> different answer text. The exact output shown below should be treated as one
+> representative run.
+
 ## Alfresco Repository
 
 This tutorial is using the same Alfresco Repository and OpenDMA endpoint we have
@@ -33,10 +39,10 @@ instructions if you have skipped the previous tutorial. Also make sure to
 
 ## Install Dependencies
 
-Install Haystack, the OpenDMA integration, pypdf, trafilatura and docling-haystack:
+Install Haystack 3, the OpenDMA integration, pypdf, trafilatura and docling-haystack:
 
 ```bash
-pip install haystack-ai opendma-haystack pypdf trafilatura docling-haystack
+pip install "haystack-ai>=3,<4" "opendma-haystack>=0.2.0" pypdf trafilatura docling-haystack
 ```
 
 ## Setup
@@ -369,7 +375,7 @@ agent = Agent(
 
 Let's run the agent with a sample question.
 
-We print out the outcome of each node while we transition through the nodes.
+We print the messages, tool calls, and tool results produced during the agent run.
 
 ```python
 from haystack.dataclasses import ChatMessage
@@ -428,7 +434,7 @@ Message 4: tool
 Next, the orchestrator decides to run a search scoped to the `swsdp` site with
 the query term "localisation of new website design".
 
-The tool returns the search result and the grader assesses this search result.
+The tool returns the search result to the agent.
 
 ```text
 Message 5: assistant

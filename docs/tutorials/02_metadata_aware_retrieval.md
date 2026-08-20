@@ -15,9 +15,10 @@ To fix this, we extend the basic RAG and enable it to take additional
 information into account, like the Site where the document is stored.
 
 > [!NOTE]
-> The example in this tutorial is a bit brittle and might not always work.
-> The Alfresco Sample Site is full of "Lorem Ipsum" text making similarity
-> search challenging.
+> This tutorial uses live LLM calls. Even with `temperature=0`, hosted models can
+> change over time and may choose slightly different retrieval queries or produce
+> different answer text. The exact output shown below should be treated as one
+> representative run.
 
 ## Running Alfresco Community Edition
 
@@ -90,7 +91,7 @@ in a web browser and authenticate with your Alfresco credentials (`admin/admin` 
 Install Haystack, the OpenDMA integration, pypdf, trafilatura and docling-haystack:
 
 ```bash
-pip install haystack-ai opendma-haystack pypdf trafilatura docling-haystack
+pip install "haystack-ai>=3,<4" "opendma-haystack>=0.2.0" pypdf trafilatura docling-haystack
 ```
 
 ## Indexing Pipeline
