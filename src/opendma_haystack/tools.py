@@ -187,9 +187,19 @@ class OpenDMAToolset(Toolset):
             ),
         ]
 
-    def get_metadata(self, object_id: str) -> dict[str, Any]:
+    def get_metadata(self, object_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
         """Implementation for opendma_get_metadata."""
         try:
+            input_error = self._validate_tool_input(
+                tool_name="opendma_get_metadata",
+                provided=kwargs,
+                required={"object_id": object_id},
+                allowed={"object_id"},
+            )
+            if input_error is not None:
+                return input_error
+
+            assert object_id is not None
             session = self._create_session()
             try:
                 obj = self._get_object(session, object_id)
@@ -207,18 +217,36 @@ class OpenDMAToolset(Toolset):
 
     def list_children(
         self,
-        object_id: str,
+        object_id: str | None = None,
         include_folders: bool = True,
         include_files: bool = True,
         name_pattern: str | None = None,
         continuation_token: str | None = None,
         included_metadata: list[str] | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Implementation for opendma_list_children."""
         try:
+            input_error = self._validate_tool_input(
+                tool_name="opendma_list_children",
+                provided=kwargs,
+                required={"object_id": object_id},
+                allowed={
+                    "object_id",
+                    "include_folders",
+                    "include_files",
+                    "name_pattern",
+                    "continuation_token",
+                    "included_metadata",
+                },
+            )
+            if input_error is not None:
+                return input_error
+
             if not include_folders and not include_files:
                 raise ValueError("include_folders and include_files cannot both be false")
 
+            assert object_id is not None
             session = self._create_session()
             try:
                 folder = self._get_object(session, object_id)
@@ -262,11 +290,22 @@ class OpenDMAToolset(Toolset):
 
     def read_text(
         self,
-        object_id: str,
+        object_id: str | None = None,
         chunk_continuation_token: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Implementation for opendma_read_text."""
         try:
+            input_error = self._validate_tool_input(
+                tool_name="opendma_read_text",
+                provided=kwargs,
+                required={"object_id": object_id},
+                allowed={"object_id", "chunk_continuation_token"},
+            )
+            if input_error is not None:
+                return input_error
+
+            assert object_id is not None
             documents = self._read_text_documents(object_id)
 
             offset = self._decode_offset_token(chunk_continuation_token)
@@ -291,9 +330,23 @@ class OpenDMAToolset(Toolset):
         except Exception as exc:
             return self._tool_error("opendma_read_text", exc)
 
-    def describe_class(self, type_or_aspect_name: str) -> dict[str, Any]:
+    def describe_class(
+        self,
+        type_or_aspect_name: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """Implementation for opendma_describe_class."""
         try:
+            input_error = self._validate_tool_input(
+                tool_name="opendma_describe_class",
+                provided=kwargs,
+                required={"type_or_aspect_name": type_or_aspect_name},
+                allowed={"type_or_aspect_name"},
+            )
+            if input_error is not None:
+                return input_error
+
+            assert type_or_aspect_name is not None
             session = self._create_session()
             try:
                 repository = session.get_repository(self._repository_id())
@@ -459,6 +512,46 @@ class OpenDMAToolset(Toolset):
             "error_type": exc.__class__.__name__,
             "message": message,
         }
+
+    def _tool_input_error(self, tool_name: str, message: str) -> dict[str, Any]:
+        return {
+            "error": True,
+            "tool": tool_name,
+            "error_type": "ToolInputError",
+            "message": message,
+        }
+
+    def _validate_tool_input(
+        self,
+        tool_name: str,
+        provided: dict[str, Any],
+        required: dict[str, Any],
+        allowed: set[str],
+    ) -> dict[str, Any] | None:
+        unexpected = sorted(set(provided) - allowed)
+        if unexpected:
+            allowed_message = ", ".join(sorted(allowed)) if allowed else "none"
+            return self._tool_input_error(
+                tool_name,
+                "Unexpected parameter(s): "
+                + ", ".join(unexpected)
+                + ". Allowed parameters: "
+                + allowed_message
+                + ".",
+            )
+
+        missing = [
+            name
+            for name, value in required.items()
+            if value is None or not isinstance(value, str) or not value.strip()
+        ]
+        if missing:
+            return self._tool_input_error(
+                tool_name,
+                "Missing required string parameter(s): " + ", ".join(missing) + ".",
+            )
+
+        return None
 
     def _extract_metadata(self, obj: OdmaObject) -> dict[str, MetadataValue]:
         metadata: dict[str, MetadataValue] = {}
@@ -667,9 +760,24 @@ class _SearchToolset(OpenDMAToolset):
         in_folder: str | None = None,
         include_subfolder_in_folder: bool | None = None,
         included_metadata: list[str] | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Implementation for opendma_search using a platform query language."""
         try:
+            input_error = self._validate_tool_input(
+                tool_name="opendma_search",
+                provided=kwargs,
+                required={},
+                allowed={
+                    "full_text",
+                    "in_folder",
+                    "include_subfolder_in_folder",
+                    "included_metadata",
+                },
+            )
+            if input_error is not None:
+                return input_error
+
             query = self._build_search_query(
                 full_text=full_text,
                 in_folder=in_folder,
@@ -813,9 +921,18 @@ class AlfrescoToolset(_SearchToolset):
             ),
         ]
 
-    def list_sites(self) -> list[dict[str, Any]]:
+    def list_sites(self, **kwargs: Any) -> list[dict[str, Any]] | dict[str, Any]:
         """Implementation for alfresco_list_sites."""
         try:
+            input_error = self._validate_tool_input(
+                tool_name="alfresco_list_sites",
+                provided=kwargs,
+                required={},
+                allowed=set(),
+            )
+            if input_error is not None:
+                return input_error
+
             session = self._create_session()
             try:
                 search_result = session.search(

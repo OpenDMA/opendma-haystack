@@ -36,6 +36,48 @@ def test_open_dma_toolset_exposes_core_tools() -> None:
     ]
 
 
+def test_open_dma_tool_returns_error_for_missing_required_parameter() -> None:
+    toolset = OpenDMAToolset(endpoint="http://localhost:8080/opendma", repository_id="repo")
+    metadata_tool = next(tool for tool in toolset.get_tools() if tool.name == "opendma_get_metadata")
+
+    result = metadata_tool.invoke()
+
+    assert result == {
+        "error": True,
+        "tool": "opendma_get_metadata",
+        "error_type": "ToolInputError",
+        "message": "Missing required string parameter(s): object_id.",
+    }
+
+
+def test_open_dma_tool_returns_error_for_unexpected_parameter() -> None:
+    toolset = OpenDMAToolset(endpoint="http://localhost:8080/opendma", repository_id="repo")
+    metadata_tool = next(tool for tool in toolset.get_tools() if tool.name == "opendma_get_metadata")
+
+    result = metadata_tool.invoke(document_id="doc1")
+
+    assert result == {
+        "error": True,
+        "tool": "opendma_get_metadata",
+        "error_type": "ToolInputError",
+        "message": "Unexpected parameter(s): document_id. Allowed parameters: object_id.",
+    }
+
+
+def test_open_dma_list_children_tool_returns_error_when_includes_are_false() -> None:
+    toolset = OpenDMAToolset(endpoint="http://localhost:8080/opendma", repository_id="repo")
+    list_tool = next(tool for tool in toolset.get_tools() if tool.name == "opendma_list_children")
+
+    result = list_tool.invoke(object_id="folder1", include_folders=False, include_files=False)
+
+    assert result == {
+        "error": True,
+        "tool": "opendma_list_children",
+        "error_type": "ValueError",
+        "message": "include_folders and include_files cannot both be false",
+    }
+
+
 def test_alfresco_toolset_exposes_search_and_site_tools() -> None:
     toolset = AlfrescoToolset(endpoint="http://localhost:8080/opendma")
 
@@ -47,6 +89,20 @@ def test_alfresco_toolset_exposes_search_and_site_tools() -> None:
         "opendma_search",
         "alfresco_list_sites",
     ]
+
+
+def test_alfresco_list_sites_tool_returns_error_for_unexpected_parameter() -> None:
+    toolset = AlfrescoToolset(endpoint="http://localhost:8080/opendma")
+    list_sites_tool = next(tool for tool in toolset.get_tools() if tool.name == "alfresco_list_sites")
+
+    result = list_sites_tool.invoke(site="swsdp")
+
+    assert result == {
+        "error": True,
+        "tool": "alfresco_list_sites",
+        "error_type": "ToolInputError",
+        "message": "Unexpected parameter(s): site. Allowed parameters: none.",
+    }
 
 
 def test_open_dma_toolset_encodes_and_decodes_offset_tokens() -> None:
