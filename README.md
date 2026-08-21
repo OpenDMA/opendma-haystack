@@ -1,25 +1,30 @@
 # OpenDMA Haystack
 
-Haystack document fetchers and retrievers for [OpenDMA](https://opendma.org/).
+Integrate Haystack with Enterprise Content Management systems such as Alfresco,
+CMOD, Documentum, FileNet P8, OnBase, SharePoint, and other platforms.
 
-OpenDMA is a vendor-neutral abstraction layer for enterprise content management
-systems. It provides a common API for repositories such as Alfresco, CMOD,
-Documentum, FileNet P8, OnBase, SharePoint, and other ECM or document management
-platforms. This package connects that API to Haystack by loading and retrieving
-OpenDMA repository content through Haystack fetcher and retriever components.
+[OpenDMA](https://opendma.org/) is a vendor-neutral abstraction layer for
+Enterprise Content Management. It provides a common API for repositories allowing
+developers to build applications that access content stored on different
+platforms, including federating across multiple repositories.
 
-Use this package when you want to build Haystack applications, RAG pipelines, or
-content analysis workflows on top of documents stored in ECM systems.
+This package connects that API to Haystack with components to retrieve and fetch
+OpenDMA documents as part of pipelines.
+
+A convenient Toolset allows agentic applications to browse through complex
+repository layouts to retrieve information.
+
+See our [examples](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/examples/README.md)
+and [tutorials](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/tutorials/README.md)
+to learn how to build RAG pipelines and tool-calling agents.
 
 ## Features
 
-- Fetch binary content streams from an OpenDMA REST service by document ID or
-  folder ID.
-- Fetch complete Alfresco sites with the specialized `AlfrescoFetcher`.
-- Search OpenDMA repositories with metadata-only Haystack retrievers.
-- Use specialized retrievers for Alfresco, Documentum, FileNet P8, and OnBase.
-- Preserve OpenDMA and repository metadata on Haystack `ByteStream` and
-  `Document` objects.
+- Tools to browse an ECM repository, e.g. to enable agents to discover relevant documents.
+- Tools for reading text chunks of documents, e.g. to allow agents to read sections of documents.
+- Fetch binary content streams by document ID or folder ID, e.g. to build a knowledge base.
+- Search repositories with metadata-only Haystack retrievers, e.g. to use an existing repository as knowledge base.
+- Preserve full metadata on every Haystack `ByteStream` and `Document`, e.g. to scope RAG retrieval to a subset of relevant items.
 
 ## Installation
 
@@ -82,6 +87,38 @@ documents = result["documents"]
 Retriever results are metadata-only locator `Document` objects. They identify
 matching repository documents and can be passed to `OpenDMAFetcher` to fetch the
 actual content.
+
+The `OpenDMAToolset` provides various tools to allow agents to browse repository
+layouts and read sections of text documents:
+
+```python
+from opendma_haystack import OpenDMAToolset
+from haystack.components.agents import Agent
+from haystack.components.generators.chat import OpenAIChatGenerator
+from haystack.utils import Secret
+from haystack.dataclasses import ChatMessage
+
+toolset = OpenDMAToolset(
+    endpoint="http://localhost:8080/opendma",
+    username="ignored",
+    password="ignored",
+    repository_id="sample-repo",
+)
+
+agent = Agent(
+    chat_generator=OpenAIChatGenerator(
+        api_key=Secret.from_env_var("OPENAI_API_KEY"),
+        model="gpt-4o-mini",
+    ),
+    tools=toolset,
+    system_prompt="You are...",
+)
+
+result = agent.run(messages=[ChatMessage.from_user(
+  "Where can I find the latest meeting notes of project orion?")])
+
+print(result.get("last_message").text)
+```
 
 ## Documentation
 

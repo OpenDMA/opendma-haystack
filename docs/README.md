@@ -7,12 +7,12 @@ For installation and a short project overview, see the project
 
 ## Core Concepts
 
-OpenDMA provides a uniform API for Enterprise Content Management (ECM) and
+[OpenDMA](https://opendma.org/) provides a uniform API for Enterprise Content Management (ECM) and
 document management repositories. It supports Alfresco, CMOD (Content Manager
 OnDemand), Documentum, FileNet P8, OpenText, OnBase, Nuxeo, SharePoint,
 and many more.
 
-`opendma-haystack` provides Haystack 2.x components for using OpenDMA as an
+`opendma-haystack` provides Haystack components for using OpenDMA as an
 enterprise content source:
 
 - `OpenDMAFetcher` fetches binary content streams and metadata from OpenDMA and
@@ -29,6 +29,10 @@ metadata to identify matching repository documents. To turn repository files
 into text for RAG, connect a fetcher to Haystack converters such as
 `TextFileToDocument`, `PyPDFToDocument`, `HTMLToDocument`, or
 `DoclingConverter`.
+
+`OpenDMAToolset` provides a set of tools to be used by tool-calling agents to
+navigate around the repository, investigate the data model and read sections of
+documents.
 
 ## [OpenDMAFetcher](./Fetcher.md)
 
@@ -75,17 +79,32 @@ documents = result["documents"]
 See the [Retriever](./Retriever.md) documentation for search behavior,
 metadata-only result documents, and repository-specific retrievers.
 
-## Examples
+## [OpenDMAToolset](./Toolset.md)
 
-Runnable examples are documented in [examples/README.md](examples/README.md).
-Examples that use Haystack converters for PDF, HTML, or Microsoft Office formats
-require the optional examples dependencies:
+`OpenDMAToolset` provides a set of tools to be used by agents.
 
-```bash
-uv run --extra examples python docs/examples/05_fetcher_pipeline.py
+```python
+from opendma_haystack import OpenDMAToolset
+
+toolset = OpenDMAToolset(
+    endpoint="http://localhost:8080/opendma",
+    username="ignored",
+    password="ignored",
+    repository_id="sample-repo",
+)
+
+tools = toolset.get_tools()
+
+print("Tools in Toolset")
+for tool in tools:
+    print(tool.name)
 ```
 
-## Tutorials
+See the [Toolset](./Toolset.md) documentation for details.
+
+## Examples and Tutorials
+
+Runnable examples are documented in [examples/README.md](examples/README.md).
 
 Guided Haystack application tutorials are documented in
 [tutorials/README.md](tutorials/README.md).
