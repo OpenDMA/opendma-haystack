@@ -1,6 +1,6 @@
 [project]
 name = "opendma-haystack"
-version = "0.3.0"
+version = "0.4.0.dev1"
 description = "Integration of Enterprise Content Management (ECM) systems with Haystack through toolsets, fetchers, and retrievers"
 license = "MIT"
 license-files = ["LICENSE"]
