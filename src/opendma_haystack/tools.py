@@ -19,6 +19,7 @@ from haystack.dataclasses import ByteStream
 from haystack.tools import Tool, Toolset
 from opendma.api import OdmaFolder, OdmaId, OdmaObject, OdmaQName, OdmaType
 from opendma.remote import connect
+from pydantic import BaseModel
 
 from opendma_haystack._common import normalize_mime_type
 from opendma_haystack.fetchers import OpenDMAFetcher
@@ -26,6 +27,81 @@ from opendma_haystack.fetchers import OpenDMAFetcher
 ScalarValue = str | int | float | bool | None
 MetadataValue = ScalarValue | list[ScalarValue]
 TextExtractor = Callable[[list[ByteStream]], list[Document]]
+
+
+class PropertyDescription(BaseModel):
+    """Description of an OpenDMA class or aspect property."""
+
+    name: str
+    type: str
+    description: str
+    required: bool
+    multi_value: bool
+    queryable: bool | None = None
+    possible_values: list[str] | None = None
+
+
+class OpenDMAObjectMetadataResult(BaseModel):
+    """Metadata result for one OpenDMA object."""
+
+    object_id: str
+    type_name: str
+    aspect_names: list[str]
+    name: str
+    metadata: dict[str, MetadataValue]
+
+
+class OpenDMAObjectItem(BaseModel):
+    """Compact OpenDMA object representation returned by list and search tools."""
+
+    object_id: str
+    type_name: str
+    aspect_names: list[str]
+    name: str
+    metadata: dict[str, MetadataValue]
+
+
+class OpenDMAListResult(BaseModel):
+    """Paged list/search result."""
+
+    items: list[OpenDMAObjectItem]
+    has_more: bool
+    continuation_token: str | None = None
+
+
+class OpenDMAReadChunk(BaseModel):
+    """Text chunk returned by opendma_read_text."""
+
+    text: str
+    metadata: dict[str, MetadataValue]
+    chunk_index: int
+
+
+class OpenDMAReadTextResult(BaseModel):
+    """Paged text extraction result."""
+
+    chunks: list[OpenDMAReadChunk]
+    has_more: bool
+    chunk_continuation_token: str | None = None
+
+
+class OpenDMAClassDescription(BaseModel):
+    """Description of an OpenDMA type or aspect."""
+
+    name: str
+    kind: str
+    parent: str | None
+    inherited_properties: list[PropertyDescription]
+    declared_properties: list[PropertyDescription]
+
+
+class SiteDescription(BaseModel):
+    """Description of an Alfresco site."""
+
+    short_name: str
+    title: str
+    description: str
+    root_folder_id: str
 
 
 @dataclass
@@ -203,13 +279,13 @@ class OpenDMAToolset(Toolset):
             session = self._create_session()
             try:
                 obj = self._get_object(session, object_id)
-                return {
-                    "object_id": str(obj.get_id()),
-                    "type_name": str(obj.get_odma_class().get_qname()),
-                    "aspect_names": [str(aspect.get_qname()) for aspect in obj.get_aspects()],
-                    "name": self._object_name(obj),
-                    "metadata": self._extract_metadata(obj),
-                }
+                return OpenDMAObjectMetadataResult(
+                    object_id=str(obj.get_id()),
+                    type_name=str(obj.get_odma_class().get_qname()),
+                    aspect_names=[str(aspect.get_qname()) for aspect in obj.get_aspects()],
+                    name=self._object_name(obj),
+                    metadata=self._extract_metadata(obj),
+                ).model_dump()
             finally:
                 session.close()
         except Exception as exc:
@@ -254,7 +330,7 @@ class OpenDMAToolset(Toolset):
                     raise ValueError(f"Object {object_id} is not an OpenDMA folder")
 
                 offset = self._decode_offset_token(continuation_token)
-                items: list[dict[str, Any]] = []
+                items: list[OpenDMAObjectItem] = []
                 has_more = False
                 matched = 0
 
@@ -276,13 +352,14 @@ class OpenDMAToolset(Toolset):
                     matched += 1
 
                 next_offset = offset + len(items)
-                return {
-                    "items": items,
-                    "has_more": has_more,
-                    "continuation_token": self._encode_offset_token(next_offset)
+                result = OpenDMAListResult(
+                    items=items,
+                    has_more=has_more,
+                    continuation_token=self._encode_offset_token(next_offset)
                     if has_more
                     else None,
-                }
+                )
+                return result.model_dump()
             finally:
                 session.close()
         except Exception as exc:
@@ -313,20 +390,21 @@ class OpenDMAToolset(Toolset):
             next_offset = offset + len(page)
             has_more = next_offset < len(documents)
 
-            return {
-                "chunks": [
-                    {
-                        "text": document.content or "",
-                        "metadata": self._filter_metadata(document.meta, None),
-                        "chunk_index": offset + index,
-                    }
+            result = OpenDMAReadTextResult(
+                chunks=[
+                    OpenDMAReadChunk(
+                        text=document.content or "",
+                        metadata=self._filter_metadata(document.meta, None),
+                        chunk_index=offset + index,
+                    )
                     for index, document in enumerate(page)
                 ],
-                "has_more": has_more,
-                "chunk_continuation_token": self._encode_offset_token(next_offset)
+                has_more=has_more,
+                chunk_continuation_token=self._encode_offset_token(next_offset)
                 if has_more
                 else None,
-            }
+            )
+            return result.model_dump()
         except Exception as exc:
             return self._tool_error("opendma_read_text", exc)
 
@@ -363,17 +441,17 @@ class OpenDMAToolset(Toolset):
                 ]
                 parent = odma_class.get_super_class()
 
-                return {
-                    "name": str(odma_class.get_qname()),
-                    "kind": "aspect" if odma_class.get_aspect() else "type",
-                    "parent": str(parent.get_qname()) if parent is not None else None,
-                    "inherited_properties": [
+                return OpenDMAClassDescription(
+                    name=str(odma_class.get_qname()),
+                    kind="aspect" if odma_class.get_aspect() else "type",
+                    parent=str(parent.get_qname()) if parent is not None else None,
+                    inherited_properties=[
                         self._property_description(prop) for prop in inherited
                     ],
-                    "declared_properties": [
+                    declared_properties=[
                         self._property_description(prop) for prop in declared
                     ],
-                }
+                ).model_dump()
             finally:
                 session.close()
         except Exception as exc:
@@ -607,14 +685,14 @@ class OpenDMAToolset(Toolset):
         self,
         obj: OdmaObject,
         included_metadata: list[str] | None,
-    ) -> dict[str, Any]:
-        return {
-            "object_id": str(obj.get_id()),
-            "type_name": str(obj.get_odma_class().get_qname()),
-            "aspect_names": [str(aspect.get_qname()) for aspect in obj.get_aspects()],
-            "name": self._object_name(obj),
-            "metadata": self._filter_metadata(self._extract_metadata(obj), included_metadata),
-        }
+    ) -> OpenDMAObjectItem:
+        return OpenDMAObjectItem(
+            object_id=str(obj.get_id()),
+            type_name=str(obj.get_odma_class().get_qname()),
+            aspect_names=[str(aspect.get_qname()) for aspect in obj.get_aspects()],
+            name=self._object_name(obj),
+            metadata=self._filter_metadata(self._extract_metadata(obj), included_metadata),
+        )
 
     def _object_name(self, obj: OdmaObject) -> str:
         metadata = self._extract_metadata(obj)
@@ -649,21 +727,21 @@ class OpenDMAToolset(Toolset):
         value = prop.get_string()
         return value or ""
 
-    def _property_description(self, property_info: Any) -> dict[str, Any]:
+    def _property_description(self, property_info: Any) -> PropertyDescription:
         choices = [
             choice.get_display_name()
             for choice in property_info.get_choices()
             if choice.get_display_name()
         ]
-        return {
-            "name": str(property_info.get_qname()),
-            "type": str(property_info.get_data_type()),
-            "description": property_info.get_display_name(),
-            "required": property_info.get_required(),
-            "multi_value": property_info.get_multi_value(),
-            "queryable": None,
-            "possible_values": choices or None,
-        }
+        return PropertyDescription(
+            name=str(property_info.get_qname()),
+            type=str(property_info.get_data_type()),
+            description=property_info.get_display_name(),
+            required=property_info.get_required(),
+            multi_value=property_info.get_multi_value(),
+            queryable=None,
+            possible_values=choices or None,
+        )
 
     def _find_class(self, repository: Any, qname: str) -> Any | None:
         roots = [repository.get_root_class(), *list(repository.get_root_aspects())]
@@ -807,17 +885,17 @@ class _SearchToolset(OpenDMAToolset):
                 query,
             )
 
-            items = []
+            items: list[OpenDMAObjectItem] = []
             for obj in search_result.get_objects():
                 items.append(self._object_item(obj, included_metadata=included_metadata))
                 if len(items) >= search_result_limit:
                     break
 
-            return {
-                "items": items,
-                "has_more": False,
-                "continuation_token": None,
-            }
+            return OpenDMAListResult(
+                items=items,
+                has_more=False,
+                continuation_token=None,
+            ).model_dump()
         finally:
             session.close()
 
@@ -941,22 +1019,22 @@ class AlfrescoToolset(_SearchToolset):
                     'TYPE:"st:site"',
                 )
 
-                sites = []
+                sites: list[SiteDescription] = []
                 for obj in search_result.get_objects():
                     if not isinstance(obj, OdmaFolder):
                         continue
                     sites.append(
-                        {
-                            "short_name": self._metadata_string(obj, "alfresco:cm:name"),
-                            "title": self._metadata_string(obj, "alfresco:cm:title"),
-                            "description": self._metadata_string(
+                        SiteDescription(
+                            short_name=self._metadata_string(obj, "alfresco:cm:name"),
+                            title=self._metadata_string(obj, "alfresco:cm:title"),
+                            description=self._metadata_string(
                                 obj,
                                 "alfresco:cm:description",
                             ),
-                            "root_folder_id": str(obj.get_id()),
-                        }
+                            root_folder_id=str(obj.get_id()),
+                        )
                     )
-                return sites
+                return [site.model_dump() for site in sites]
             finally:
                 session.close()
         except Exception as exc:
