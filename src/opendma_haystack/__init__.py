@@ -10,15 +10,27 @@ from opendma_haystack.retrievers import (
     OnBaseRetriever,
     OpenDMARetriever,
 )
+from opendma_haystack.tools import (
+    AlfrescoToolset,
+    DocumentumToolset,
+    FileNetP8Toolset,
+    OnBaseToolset,
+    OpenDMAToolset,
+)
 
 __version__ = "0.2.0"
 
 __all__ = [
     "AlfrescoRetriever",
     "AlfrescoFetcher",
+    "AlfrescoToolset",
     "DocumentumRetriever",
+    "DocumentumToolset",
     "FileNetP8Retriever",
+    "FileNetP8Toolset",
     "OnBaseRetriever",
+    "OnBaseToolset",
     "OpenDMAFetcher",
     "OpenDMARetriever",
+    "OpenDMAToolset",
 ]

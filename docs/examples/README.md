@@ -69,6 +69,19 @@ Run with optional `example` dependencies:
 uv run --extra examples python docs/examples/05_fetcher_pipeline.py
 ```
 
+### `06_tools.py`
+
+Demonstrates all generic OpenDMA tools exposed by `OpenDMAToolset`:
+
+The example configures a small text extractor for `opendma_read_text` that
+converts text and PDF byte streams into Haystack `Document` objects.
+
+Run with optional `example` dependencies:
+
+```bash
+uv run --extra examples python docs/examples/06_tools.py
+```
+
 ## Alfresco Examples
 
 Alfresco Community Edition is available free of charge. We use it to explore
