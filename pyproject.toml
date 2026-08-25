@@ -97,7 +97,7 @@ follow_imports = "skip"
 testpaths = ["tests"]
 addopts = "--cov=opendma_haystack --cov-report=term-missing"
 markers = [
-    "integration: tests requiring an external OpenDMA tutorial repository and an Alfresco deployment",
+    "integration: tests requiring an external OpenDMA tutorial repository",
 ]
 
 [tool.coverage.run]

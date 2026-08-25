@@ -78,7 +78,6 @@ Prepare and publish a release:
 
 ```bash
 OPENDMA_TUTORIAL_ENDPOINT=http://localhost:8080/opendma
-OPENDMA_ALFRESCO_ENDPOINT=http://localhost:7070/opendma/alf
 uv sync --all-extras --dev
 uv run pytest
 uv run ruff check src tests
