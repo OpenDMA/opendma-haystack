@@ -14,8 +14,8 @@ OpenDMA documents as part of pipelines.
 A convenient Toolset allows agentic applications to browse through complex
 repository layouts to retrieve information.
 
-See our [examples](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/examples/README.md)
-and [tutorials](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/tutorials/README.md)
+See our [examples](https://github.com/OpenDMA/opendma-haystack/blob/main/docs/examples/README.md)
+and [tutorials](https://github.com/OpenDMA/opendma-haystack/blob/main/docs/tutorials/README.md)
 to learn how to build RAG pipelines and tool-calling agents.
 
 ## Features
@@ -122,9 +122,9 @@ print(result.get("last_message").text)
 
 ## Documentation
 
-- [Tutorials](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/tutorials/README.md): guided Haystack application tutorials
-- [Documentation](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/README.md): component usage, fetcher options, and retriever behavior
-- [Examples](https://github.com/OpenDMA/opendma-haystack/tree/main/docs/examples/README.md): runnable examples using the tutorial repository
+- [Tutorials](https://github.com/OpenDMA/opendma-haystack/blob/main/docs/tutorials/README.md): guided Haystack application tutorials
+- [Documentation](https://github.com/OpenDMA/opendma-haystack/blob/main/docs/README.md): component usage, fetcher options, and retriever behavior
+- [Examples](https://github.com/OpenDMA/opendma-haystack/blob/main/docs/examples/README.md): runnable examples using the tutorial repository
 
 ## Development
 
