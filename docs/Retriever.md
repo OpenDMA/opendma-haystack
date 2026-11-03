@@ -143,6 +143,33 @@ Optional arguments:
   `raise_on_error` is `False`
 - `metadata_fn`: optional callable that can add or override metadata for each
   OpenDMA document
+- `match_mode`: matching behavior for vendor-specific retrievers: `"any"`,
+  `"all"`, or `"phrase"`
+
+## Matching Modes
+
+Vendor-specific retrievers support `MatchMode` to control how words in the
+Haystack query are combined:
+
+- `MatchMode.ANY`: match any query word. This is the default.
+- `MatchMode.ALL`: require every query word.
+- `MatchMode.PHRASE`: search for the complete query as a phrase.
+
+```python
+from opendma_haystack import AlfrescoRetriever, MatchMode
+
+retriever = AlfrescoRetriever(
+    endpoint="http://localhost:7070/opendma/alf",
+    sites=["swsdp"],
+    match_mode=MatchMode.ALL,
+)
+result = retriever.run(query="website design")
+```
+
+The mode is translated into the query syntax of the selected repository. The
+generic `OpenDMARetriever` passes its query through unchanged and therefore
+does not apply `match_mode`. Exact matching behavior still depends on the
+repository's full-text search configuration.
 
 ## AlfrescoRetriever
 
@@ -172,6 +199,9 @@ defaults and additions:
 - `repository_id="Alfresco"`
 - `query_language="alfresco:afts"`
 - `sites`: optional Alfresco site short names used to restrict retrieval
+
+The default matching mode is `MatchMode.ANY`. Use `MatchMode.PHRASE` to retain
+the previous behavior of searching the complete input as one quoted phrase.
 
 ## FileNetP8Retriever
 

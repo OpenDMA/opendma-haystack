@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from enum import Enum
 from html import escape as escape_xml_text
 from typing import Any
 
@@ -21,6 +22,14 @@ from opendma_haystack._common import (
 def _split_words(query: str) -> list[str]:
     """Split a natural language query into non-empty words."""
     return re.sub(r"\s+", " ", query).strip().split()
+
+
+class MatchMode(str, Enum):
+    """Controls how words from a retriever query are combined."""
+
+    ANY = "any"
+    ALL = "all"
+    PHRASE = "phrase"
 
 
 TITLE_METADATA_KEYS = (
@@ -46,6 +55,7 @@ class OpenDMARetriever:
         raise_on_error: bool = True,
         warn_on_error: bool = True,
         metadata_fn: MetadataFn | None = None,
+        match_mode: MatchMode | str = MatchMode.ANY,
     ) -> None:
         """Initialize the OpenDMA retriever."""
         if not repository_id:
@@ -64,6 +74,7 @@ class OpenDMARetriever:
         self.raise_on_error = raise_on_error
         self.warn_on_error = warn_on_error
         self.metadata_fn = metadata_fn
+        self.match_mode = MatchMode(match_mode)
 
     def _build_query(self, query: str) -> str:
         """Build the OpenDMA query from the retriever input."""
@@ -147,6 +158,7 @@ class AlfrescoRetriever(OpenDMARetriever):
         raise_on_error: bool = True,
         warn_on_error: bool = True,
         metadata_fn: MetadataFn | None = None,
+        match_mode: MatchMode | str = MatchMode.ANY,
     ) -> None:
         """Initialize the Alfresco retriever."""
         if sites is not None:
@@ -162,6 +174,7 @@ class AlfrescoRetriever(OpenDMARetriever):
             raise_on_error=raise_on_error,
             warn_on_error=warn_on_error,
             metadata_fn=metadata_fn,
+            match_mode=match_mode,
         )
         self.sites = sites
 
@@ -170,8 +183,16 @@ class AlfrescoRetriever(OpenDMARetriever):
         if not normalized_query:
             raise ValueError("query must not be empty")
 
-        escaped_query = normalized_query.replace("\\", "\\\\").replace('"', '\\"')
-        afts_query = f'TEXT:"{escaped_query}"'
+        if self.match_mode is MatchMode.PHRASE:
+            escaped_query = normalized_query.replace("\\", "\\\\").replace('"', '\\"')
+            afts_query = f'TEXT:"{escaped_query}"'
+        else:
+            words = _split_words(normalized_query)
+            operator = " OR " if self.match_mode is MatchMode.ANY else " AND "
+            escaped_words = [
+                word.replace("\\", "\\\\").replace('"', '\\"') for word in words
+            ]
+            afts_query = "(" + operator.join(f'TEXT:"{word}"' for word in escaped_words) + ")"
         if self.sites:
             site_filters = [f'SITE:"{site}"' for site in self.sites]
             afts_query += " AND (" + " OR ".join(site_filters) + ")"
@@ -192,6 +213,7 @@ class FileNetP8Retriever(OpenDMARetriever):
         raise_on_error: bool = True,
         warn_on_error: bool = True,
         metadata_fn: MetadataFn | None = None,
+        match_mode: MatchMode | str = MatchMode.ANY,
     ) -> None:
         """Initialize the FileNet P8 retriever."""
         super().__init__(
@@ -204,6 +226,7 @@ class FileNetP8Retriever(OpenDMARetriever):
             raise_on_error=raise_on_error,
             warn_on_error=warn_on_error,
             metadata_fn=metadata_fn,
+            match_mode=match_mode,
         )
 
     def _build_query(self, query: str) -> str:
@@ -211,15 +234,23 @@ class FileNetP8Retriever(OpenDMARetriever):
         if not words:
             raise ValueError("query must not be empty")
 
-        special_characters = frozenset("*?:^()[]{}@\\~")
-        escaped_words = [
-            "".join(
-                f"\\{character}" if character in special_characters else character
-                for character in word
+        if self.match_mode is MatchMode.PHRASE:
+            phrase = "".join(
+                f"\\{character}" if character in '*?"\\' else character
+                for character in " ".join(words)
             )
-            for word in words
-        ]
-        content_query = " OR ".join(escaped_words).replace("'", "''")
+            content_query = f'"{phrase}"'.replace("'", "''")
+        else:
+            special_characters = frozenset("*?:^()[]{}@\\~")
+            escaped_words = [
+                "".join(
+                    f"\\{character}" if character in special_characters else character
+                    for character in word
+                )
+                for word in words
+            ]
+            operator = " OR " if self.match_mode is MatchMode.ANY else " AND "
+            content_query = operator.join(escaped_words).replace("'", "''")
         return (
             "SELECT d.This FROM Document d "
             "INNER JOIN ContentSearch cs ON d.This = cs.QueriedObject "
@@ -241,6 +272,7 @@ class DocumentumRetriever(OpenDMARetriever):
         raise_on_error: bool = True,
         warn_on_error: bool = True,
         metadata_fn: MetadataFn | None = None,
+        match_mode: MatchMode | str = MatchMode.ANY,
     ) -> None:
         """Initialize the Documentum retriever."""
         super().__init__(
@@ -253,6 +285,7 @@ class DocumentumRetriever(OpenDMARetriever):
             raise_on_error=raise_on_error,
             warn_on_error=warn_on_error,
             metadata_fn=metadata_fn,
+            match_mode=match_mode,
         )
 
     def _build_query(self, query: str) -> str:
@@ -260,8 +293,12 @@ class DocumentumRetriever(OpenDMARetriever):
         if not words:
             raise ValueError("query must not be empty")
 
-        escaped_words = [word.replace("'", "''") for word in words]
-        content_query = " OR ".join(f"'{word}'" for word in escaped_words)
+        if self.match_mode is MatchMode.PHRASE:
+            content_query = "'" + _quote_search_phrase(" ".join(words)).replace("'", "''") + "'"
+        else:
+            escaped_words = [word.replace("'", "''") for word in words]
+            operator = " OR " if self.match_mode is MatchMode.ANY else " AND "
+            content_query = operator.join(f"'{word}'" for word in escaped_words)
         return f"SELECT * FROM dm_document SEARCH DOCUMENT CONTAINS {content_query}"
 
 
@@ -279,6 +316,7 @@ class OnBaseRetriever(OpenDMARetriever):
         raise_on_error: bool = True,
         warn_on_error: bool = True,
         metadata_fn: MetadataFn | None = None,
+        match_mode: MatchMode | str = MatchMode.ANY,
     ) -> None:
         """Initialize the OnBase retriever."""
         super().__init__(
@@ -291,14 +329,21 @@ class OnBaseRetriever(OpenDMARetriever):
             raise_on_error=raise_on_error,
             warn_on_error=warn_on_error,
             metadata_fn=metadata_fn,
+            match_mode=match_mode,
         )
 
     def _build_query(self, query: str) -> str:
-        words = _split_words(query)
+        cleaned_query = query.replace('"', "").replace("'", "")
+        words = _split_words(cleaned_query)
         if not words:
             raise ValueError("query must not be empty")
 
-        full_text_query = escape_xml_text(" OR ".join(words), quote=False)
+        if self.match_mode is MatchMode.PHRASE:
+            full_text_query = _quote_search_phrase(" ".join(words))
+        else:
+            operator = " OR " if self.match_mode is MatchMode.ANY else " AND "
+            full_text_query = operator.join(f'"{word}"' for word in words)
+        full_text_query = escape_xml_text(full_text_query, quote=False)
         return (
             "<DocumentQuery>"
             '<CustomQueries isList="true"></CustomQueries>'
@@ -316,3 +361,10 @@ class OnBaseRetriever(OpenDMARetriever):
             "<TextSearchType>2</TextSearchType>"
             "</DocumentQuery>"
         )
+
+
+def _quote_search_phrase(value: str) -> str:
+    """Quote a phrase for backends that support quoted full-text searches."""
+    if '"' in value:
+        raise ValueError("phrase queries must not contain double quotes")
+    return f'"{value}"'

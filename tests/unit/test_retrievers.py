@@ -8,6 +8,7 @@ from opendma_haystack import (
     AlfrescoRetriever,
     DocumentumRetriever,
     FileNetP8Retriever,
+    MatchMode,
     OnBaseRetriever,
     OpenDMARetriever,
 )
@@ -50,6 +51,19 @@ def test_open_dma_retriever_passes_query_through() -> None:
     assert retriever._build_query("raw query") == "raw query"
 
 
+@pytest.mark.parametrize("match_mode", list(MatchMode))
+def test_open_dma_retriever_match_mode_does_not_change_raw_query(match_mode: MatchMode) -> None:
+    retriever = OpenDMARetriever(
+        endpoint="http://localhost:8080/opendma",
+        repository_id="repo",
+        query_language="test:query",
+        match_mode=match_mode,
+    )
+
+    assert retriever.match_mode is match_mode
+    assert retriever._build_query("raw query") == "raw query"
+
+
 def test_open_dma_retriever_document_content_from_metadata_prefers_title() -> None:
     retriever = OpenDMARetriever(
         endpoint="http://localhost:8080/opendma",
@@ -80,11 +94,16 @@ def test_alfresco_retriever_builds_afts_query() -> None:
 
     assert retriever.repository_id == "Alfresco"
     assert retriever.query_language == "alfresco:afts"
-    assert retriever._build_query("website design") == ('TEXT:"website design" AND (SITE:"swsdp")')
+    assert retriever._build_query("website design") == (
+        '(TEXT:"website" OR TEXT:"design") AND (SITE:"swsdp")'
+    )
 
 
 def test_alfresco_retriever_escapes_afts_phrase() -> None:
-    retriever = AlfrescoRetriever(endpoint="http://localhost:8080/opendma")
+    retriever = AlfrescoRetriever(
+        endpoint="http://localhost:8080/opendma",
+        match_mode=MatchMode.PHRASE,
+    )
 
     assert retriever._build_query(r'website "design" \ localisation') == (
         r'TEXT:"website \"design\" \\ localisation"'
@@ -98,8 +117,25 @@ def test_alfresco_retriever_adds_multiple_site_filters() -> None:
     )
 
     assert retriever._build_query("website design") == (
-        'TEXT:"website design" AND (SITE:"swsdp" OR SITE:"engineering")'
+        '(TEXT:"website" OR TEXT:"design") AND (SITE:"swsdp" OR SITE:"engineering")'
     )
+
+
+@pytest.mark.parametrize(
+    ("match_mode", "expected"),
+    [
+        (MatchMode.ANY, '(TEXT:"website" OR TEXT:"design")'),
+        (MatchMode.ALL, '(TEXT:"website" AND TEXT:"design")'),
+        (MatchMode.PHRASE, 'TEXT:"website design"'),
+    ],
+)
+def test_alfresco_retriever_match_modes(match_mode: MatchMode, expected: str) -> None:
+    retriever = AlfrescoRetriever(
+        endpoint="http://localhost:8080/opendma",
+        match_mode=match_mode,
+    )
+
+    assert retriever._build_query("website design") == expected
 
 
 def test_filenetp8_retriever_builds_sql_query() -> None:
@@ -124,6 +160,23 @@ def test_filenetp8_retriever_escapes_sql_query() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("match_mode", "expected"),
+    [
+        (MatchMode.ANY, "foo OR bar"),
+        (MatchMode.ALL, "foo AND bar"),
+        (MatchMode.PHRASE, '"foo bar"'),
+    ],
+)
+def test_filenetp8_retriever_match_modes(match_mode: MatchMode, expected: str) -> None:
+    retriever = FileNetP8Retriever(
+        endpoint="http://localhost:8080/opendma",
+        match_mode=match_mode,
+    )
+
+    assert retriever._build_query("foo bar").endswith(f"CONTAINS(d.*, '{expected}')")
+
+
 def test_documentum_retriever_builds_dql_query() -> None:
     retriever = DocumentumRetriever(endpoint="http://localhost:8080/opendma")
 
@@ -142,12 +195,29 @@ def test_documentum_retriever_escapes_dql_query() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("match_mode", "expected"),
+    [
+        (MatchMode.ANY, "'foo' OR 'bar'"),
+        (MatchMode.ALL, "'foo' AND 'bar'"),
+        (MatchMode.PHRASE, "'\"foo bar\"'"),
+    ],
+)
+def test_documentum_retriever_match_modes(match_mode: MatchMode, expected: str) -> None:
+    retriever = DocumentumRetriever(
+        endpoint="http://localhost:8080/opendma",
+        match_mode=match_mode,
+    )
+
+    assert retriever._build_query("foo bar").endswith(expected)
+
+
 def test_onbase_retriever_builds_document_query() -> None:
     retriever = OnBaseRetriever(endpoint="http://localhost:8080/opendma")
 
     assert retriever.repository_id == "OnBase"
     assert retriever.query_language == "onbase:DocumentQuery"
-    assert "<FullTextSearchString>foo OR bar</FullTextSearchString>" in retriever._build_query(
+    assert '<FullTextSearchString>"foo" OR "bar"</FullTextSearchString>' in retriever._build_query(
         "foo bar"
     )
 
@@ -156,8 +226,38 @@ def test_onbase_retriever_escapes_xml_query() -> None:
     retriever = OnBaseRetriever(endpoint="http://localhost:8080/opendma")
     query = retriever._build_query("<test foo bar")
 
-    assert "<FullTextSearchString>&lt;test OR foo OR bar</FullTextSearchString>" in query
+    assert (
+        '<FullTextSearchString>"&lt;test" OR "foo" OR "bar"</FullTextSearchString>'
+        in query
+    )
     assert "<TextSearchType>2</TextSearchType>" in query
+
+
+@pytest.mark.parametrize(
+    ("match_mode", "expected"),
+    [
+        (MatchMode.ANY, '"foo" OR "bar"'),
+        (MatchMode.ALL, '"foo" AND "bar"'),
+        (MatchMode.PHRASE, '"foo bar"'),
+    ],
+)
+def test_onbase_retriever_match_modes(match_mode: MatchMode, expected: str) -> None:
+    retriever = OnBaseRetriever(
+        endpoint="http://localhost:8080/opendma",
+        match_mode=match_mode,
+    )
+
+    assert f"<FullTextSearchString>{expected}</FullTextSearchString>" in retriever._build_query(
+        "foo bar"
+    )
+
+
+def test_onbase_retriever_removes_query_quotes() -> None:
+    retriever = OnBaseRetriever(endpoint="http://localhost:8080/opendma")
+
+    assert '<FullTextSearchString>"foo" OR "bar"</FullTextSearchString>' in retriever._build_query(
+        '"foo" \'bar\''
+    )
 
 
 @pytest.mark.parametrize(

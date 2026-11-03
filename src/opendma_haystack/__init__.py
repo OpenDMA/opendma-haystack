@@ -7,6 +7,7 @@ from opendma_haystack.retrievers import (
     AlfrescoRetriever,
     DocumentumRetriever,
     FileNetP8Retriever,
+    MatchMode,
     OnBaseRetriever,
     OpenDMARetriever,
 )
@@ -33,4 +34,5 @@ __all__ = [
     "OpenDMAFetcher",
     "OpenDMARetriever",
     "OpenDMAToolset",
+    "MatchMode",
 ]
