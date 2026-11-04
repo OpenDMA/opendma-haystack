@@ -22,7 +22,7 @@ Guided Haystack application tutorials are documented in
 ## Basic Usage
 
 Create an `OpenDMARetriever` with the OpenDMA REST endpoint, optional
-credentials, repository ID, and query language.
+credentials, repository ID, and an explicit query language.
 
 The generic `OpenDMARetriever` passes the input query through unchanged. This
 keeps repository-specific query syntax explicit.
@@ -130,12 +130,14 @@ Required constructor arguments:
 
 - `endpoint`: OpenDMA REST service endpoint
 - `repository_id`: ID of the OpenDMA repository
-- `query_language`: query language used to execute the input query
 
 Optional arguments:
 
 - `username`: username for authentication, when the OpenDMA endpoint requires it
 - `password`: password for authentication, when the OpenDMA endpoint requires it
+- `query_language`: defaults to `None` for platform-specific query construction.
+  Set a language to pass the input query through unchanged. The generic
+  `OpenDMARetriever` requires an explicit language when retrieving.
 - `top_k`: maximum number of OpenDMA search result objects to return
 - `raise_on_error`: raise exceptions while processing individual search results
   instead of continuing
@@ -146,10 +148,25 @@ Optional arguments:
 - `match_mode`: matching behavior for vendor-specific retrievers: `"any"`,
   `"all"`, or `"phrase"`
 
+## Query Languages
+
+With `query_language=None` (the default), specialized retrievers construct a
+full-text query using their fixed platform language. The generic
+`OpenDMARetriever` cannot construct queries and raises `NotImplementedError`
+on retrieval unless an explicit language is configured.
+
+Setting `query_language` selects raw-query mode on every retriever, including
+specialized ones. The query is passed through unchanged using that language;
+`match_mode` and generated query restrictions such as Alfresco `sites` are not
+applied. Include any restrictions directly in the raw query.
+
+Existing callers that explicitly set the platform's language while supplying
+plain search text should remove that argument to retain query construction.
+
 ## Matching Modes
 
-Vendor-specific retrievers support `MatchMode` to control how words in the
-Haystack query are combined:
+Vendor-specific retrievers support `MatchMode` to control how words in a
+generated repository query are combined when `query_language=None`:
 
 - `MatchMode.ANY`: match any query word. This is the default.
 - `MatchMode.ALL`: require every query word.
@@ -166,10 +183,9 @@ retriever = AlfrescoRetriever(
 result = retriever.run(query="website design")
 ```
 
-The mode is translated into the query syntax of the selected repository. The
-generic `OpenDMARetriever` passes its query through unchanged and therefore
-does not apply `match_mode`. Exact matching behavior still depends on the
-repository's full-text search configuration.
+The mode is translated into the query syntax of the selected repository. Exact
+matching behavior still depends on the repository's full-text search
+configuration.
 
 ## AlfrescoRetriever
 
@@ -190,15 +206,16 @@ retriever = AlfrescoRetriever(
 result = retriever.run(query="website design")
 ```
 
-When `sites` is set, retrieval is restricted to the matching Alfresco site short
-names.
+When `query_language=None` and `sites` is set, the generated AFTS query is
+restricted to the matching Alfresco site short names. In raw-query mode,
+include any site restriction directly in the query.
 
 `AlfrescoRetriever` supports the same options as `OpenDMARetriever`, with these
 defaults and additions:
 
 - `repository_id="Alfresco"`
-- `query_language="alfresco:afts"`
-- `sites`: optional Alfresco site short names used to restrict retrieval
+- Generated query language: `alfresco:afts` when `query_language=None`
+- `sites`: optional Alfresco site short names used to restrict generated queries
 
 The default matching mode is `MatchMode.ANY`. Use `MatchMode.PHRASE` to retain
 the previous behavior of searching the complete input as one quoted phrase.
@@ -224,9 +241,9 @@ result = retriever.run(query="contract invoice")
 ```
 
 `FileNetP8Retriever` supports the same options as `OpenDMARetriever`, with this
-default:
+generated query language:
 
-- `query_language="filenetp8:sql"`
+- `filenetp8:sql` when `query_language=None`
 
 ## DocumentumRetriever
 
@@ -248,9 +265,9 @@ result = retriever.run(query="contract invoice")
 ```
 
 `DocumentumRetriever` supports the same options as `OpenDMARetriever`, with this
-default:
+generated query language:
 
-- `query_language="dctm:dql"`
+- `dctm:dql` when `query_language=None`
 
 ## OnBaseRetriever
 
@@ -272,9 +289,9 @@ result = retriever.run(query="contract invoice")
 ```
 
 `OnBaseRetriever` supports the same options as `OpenDMARetriever`, with this
-default:
+generated query language:
 
-- `query_language="onbase:DocumentQuery"`
+- `onbase:DocumentQuery` when `query_language=None`
 
 ## Examples
 

@@ -22,12 +22,17 @@ def test_open_dma_retriever_requires_repository_id() -> None:
         )
 
 
-def test_open_dma_retriever_requires_query_language() -> None:
-    with pytest.raises(ValueError, match="query_language is required"):
-        OpenDMARetriever(
-            endpoint="http://localhost:8080/opendma",
-            repository_id="repo",
-        )
+def test_open_dma_retriever_requires_query_language_on_query_preparation() -> None:
+    retriever = OpenDMARetriever(
+        endpoint="http://localhost:8080/opendma",
+        repository_id="repo",
+    )
+
+    with pytest.raises(
+        NotImplementedError,
+        match="does not know how to create a query string",
+    ):
+        retriever._prepare_query("website design")
 
 
 @pytest.mark.parametrize("top_k", [0, -1])
@@ -48,7 +53,7 @@ def test_open_dma_retriever_passes_query_through() -> None:
         query_language="test:query",
     )
 
-    assert retriever._build_query("raw query") == "raw query"
+    assert retriever._prepare_query("raw query") == ("raw query", "test:query")
 
 
 @pytest.mark.parametrize("match_mode", list(MatchMode))
@@ -61,7 +66,85 @@ def test_open_dma_retriever_match_mode_does_not_change_raw_query(match_mode: Mat
     )
 
     assert retriever.match_mode is match_mode
-    assert retriever._build_query("raw query") == "raw query"
+    assert retriever._prepare_query("raw query") == ("raw query", "test:query")
+
+
+@pytest.mark.parametrize(
+    ("retriever", "expected_language"),
+    [
+        (
+            AlfrescoRetriever(endpoint="http://localhost:8080/opendma"),
+            "alfresco:afts",
+        ),
+        (
+            FileNetP8Retriever(endpoint="http://localhost:8080/opendma"),
+            "filenetp8:sql",
+        ),
+        (
+            DocumentumRetriever(endpoint="http://localhost:8080/opendma"),
+            "dctm:dql",
+        ),
+        (
+            OnBaseRetriever(endpoint="http://localhost:8080/opendma"),
+            "onbase:DocumentQuery",
+        ),
+    ],
+)
+def test_system_specific_retrievers_prepare_generated_query(
+    retriever: AlfrescoRetriever | FileNetP8Retriever | DocumentumRetriever | OnBaseRetriever,
+    expected_language: str,
+) -> None:
+    prepared_query, query_language = retriever._prepare_query("website design")
+
+    assert prepared_query != "website design"
+    assert query_language == expected_language
+
+
+@pytest.mark.parametrize(
+    ("retriever", "expected_language"),
+    [
+        (
+            AlfrescoRetriever(
+                endpoint="http://localhost:8080/opendma",
+                query_language="alfresco:afts",
+                sites=["swsdp"],
+                match_mode=MatchMode.PHRASE,
+            ),
+            "alfresco:afts",
+        ),
+        (
+            FileNetP8Retriever(
+                endpoint="http://localhost:8080/opendma",
+                query_language="filenetp8:sql",
+                match_mode=MatchMode.PHRASE,
+            ),
+            "filenetp8:sql",
+        ),
+        (
+            DocumentumRetriever(
+                endpoint="http://localhost:8080/opendma",
+                query_language="dctm:dql",
+                match_mode=MatchMode.PHRASE,
+            ),
+            "dctm:dql",
+        ),
+        (
+            OnBaseRetriever(
+                endpoint="http://localhost:8080/opendma",
+                query_language="onbase:DocumentQuery",
+                match_mode=MatchMode.PHRASE,
+            ),
+            "onbase:DocumentQuery",
+        ),
+    ],
+)
+def test_system_specific_retrievers_preserve_raw_query(
+    retriever: AlfrescoRetriever | FileNetP8Retriever | DocumentumRetriever | OnBaseRetriever,
+    expected_language: str,
+) -> None:
+    raw_query = "  SELECT *\nWHERE title = 'a \"quoted\" value'  "
+
+    assert retriever._prepare_query(raw_query) == (raw_query, expected_language)
 
 
 def test_open_dma_retriever_document_content_from_metadata_prefers_title() -> None:
@@ -93,7 +176,8 @@ def test_alfresco_retriever_builds_afts_query() -> None:
     )
 
     assert retriever.repository_id == "Alfresco"
-    assert retriever.query_language == "alfresco:afts"
+    assert retriever.query_language is None
+    assert retriever._build_query_language == "alfresco:afts"
     assert retriever._build_query("website design") == (
         '(TEXT:"website" OR TEXT:"design") AND (SITE:"swsdp")'
     )
@@ -142,7 +226,8 @@ def test_filenetp8_retriever_builds_sql_query() -> None:
     retriever = FileNetP8Retriever(endpoint="http://localhost:8080/opendma")
 
     assert retriever.repository_id == "FileNetP8"
-    assert retriever.query_language == "filenetp8:sql"
+    assert retriever.query_language is None
+    assert retriever._build_query_language == "filenetp8:sql"
     assert retriever._build_query("foo bar") == (
         "SELECT d.This FROM Document d "
         "INNER JOIN ContentSearch cs ON d.This = cs.QueriedObject "
@@ -181,7 +266,8 @@ def test_documentum_retriever_builds_dql_query() -> None:
     retriever = DocumentumRetriever(endpoint="http://localhost:8080/opendma")
 
     assert retriever.repository_id == "Documentum"
-    assert retriever.query_language == "dctm:dql"
+    assert retriever.query_language is None
+    assert retriever._build_query_language == "dctm:dql"
     assert retriever._build_query("foo bar") == (
         "SELECT * FROM dm_document SEARCH DOCUMENT CONTAINS 'foo' OR 'bar'"
     )
@@ -216,7 +302,8 @@ def test_onbase_retriever_builds_document_query() -> None:
     retriever = OnBaseRetriever(endpoint="http://localhost:8080/opendma")
 
     assert retriever.repository_id == "OnBase"
-    assert retriever.query_language == "onbase:DocumentQuery"
+    assert retriever.query_language is None
+    assert retriever._build_query_language == "onbase:DocumentQuery"
     assert '<FullTextSearchString>"foo" OR "bar"</FullTextSearchString>' in retriever._build_query(
         "foo bar"
     )

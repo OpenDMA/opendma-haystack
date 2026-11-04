@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from enum import Enum
 from html import escape as escape_xml_text
-from typing import Any
+from typing import Any, ClassVar
 
 from haystack import Document, component
 from opendma.api import OdmaDocument, OdmaId, OdmaQName
@@ -44,6 +44,8 @@ TITLE_METADATA_KEYS = (
 class OpenDMARetriever:
     """Retrieve metadata-only Haystack Documents from OpenDMA search results."""
 
+    _build_query_language: ClassVar[str | None] = None
+
     def __init__(
         self,
         endpoint: str,
@@ -60,8 +62,6 @@ class OpenDMARetriever:
         """Initialize the OpenDMA retriever."""
         if not repository_id:
             raise ValueError("repository_id is required")
-        if not query_language:
-            raise ValueError("query_language is required")
         if top_k is not None and top_k <= 0:
             raise ValueError("top_k must be greater than 0")
 
@@ -76,9 +76,22 @@ class OpenDMARetriever:
         self.metadata_fn = metadata_fn
         self.match_mode = MatchMode(match_mode)
 
-    def _build_query(self, query: str) -> str:
+    def _build_query(self, query: str) -> str:  # noqa: ARG002
         """Build the OpenDMA query from the retriever input."""
-        return query
+        raise NotImplementedError(
+            "This retriever does not know how to create a query string from the input. "
+            "Set query_language to pass a raw query through unchanged."
+        )
+
+    def _prepare_query(self, query: str) -> tuple[str, str]:
+        """Resolve the query text and language used for retrieval."""
+        if self.query_language is not None:
+            return query, self.query_language
+
+        built_query = self._build_query(query)
+        if self._build_query_language is None:
+            raise NotImplementedError("This retriever does not define a generated query language")
+        return built_query, self._build_query_language
 
     def _document_content_from_metadata(self, metadata: dict[str, Any]) -> str:
         """Choose title-like content for metadata-only Haystack retriever documents."""
@@ -106,7 +119,7 @@ class OpenDMARetriever:
     @component.output_types(documents=list[Document])
     def run(self, query: str) -> dict[str, list[Document]]:
         """Search OpenDMA and return metadata-only Haystack Documents."""
-        built_query = self._build_query(query)
+        prepared_query, query_language = self._prepare_query(query)
         session = connect(
             endpoint=self.endpoint,
             username=self.username,
@@ -117,8 +130,8 @@ class OpenDMARetriever:
         try:
             search_result = session.search(
                 OdmaId(self.repository_id),
-                OdmaQName.from_string(self.query_language),
-                built_query,
+                OdmaQName.from_string(query_language),
+                prepared_query,
             )
 
             for obj in search_result.get_objects():
@@ -146,13 +159,15 @@ class OpenDMARetriever:
 class AlfrescoRetriever(OpenDMARetriever):
     """Retrieve metadata-only Haystack Documents from Alfresco via AFTS."""
 
+    _build_query_language: ClassVar[str] = "alfresco:afts"
+
     def __init__(
         self,
         endpoint: str,
         username: str | None = None,
         password: str | None = None,
         repository_id: str = "Alfresco",
-        query_language: str = "alfresco:afts",
+        query_language: str | None = None,
         sites: list[str] | None = None,
         top_k: int | None = None,
         raise_on_error: bool = True,
@@ -202,13 +217,15 @@ class AlfrescoRetriever(OpenDMARetriever):
 class FileNetP8Retriever(OpenDMARetriever):
     """Retrieve metadata-only Haystack Documents from FileNet P8 via SQL search."""
 
+    _build_query_language: ClassVar[str] = "filenetp8:sql"
+
     def __init__(
         self,
         endpoint: str,
         username: str | None = None,
         password: str | None = None,
         repository_id: str = "FileNetP8",
-        query_language: str = "filenetp8:sql",
+        query_language: str | None = None,
         top_k: int | None = None,
         raise_on_error: bool = True,
         warn_on_error: bool = True,
@@ -261,13 +278,15 @@ class FileNetP8Retriever(OpenDMARetriever):
 class DocumentumRetriever(OpenDMARetriever):
     """Retrieve metadata-only Haystack Documents from Documentum via DQL search."""
 
+    _build_query_language: ClassVar[str] = "dctm:dql"
+
     def __init__(
         self,
         endpoint: str,
         username: str | None = None,
         password: str | None = None,
         repository_id: str = "Documentum",
-        query_language: str = "dctm:dql",
+        query_language: str | None = None,
         top_k: int | None = None,
         raise_on_error: bool = True,
         warn_on_error: bool = True,
@@ -305,13 +324,15 @@ class DocumentumRetriever(OpenDMARetriever):
 class OnBaseRetriever(OpenDMARetriever):
     """Retrieve metadata-only Haystack Documents from OnBase via DocumentQuery search."""
 
+    _build_query_language: ClassVar[str] = "onbase:DocumentQuery"
+
     def __init__(
         self,
         endpoint: str,
         username: str | None = None,
         password: str | None = None,
         repository_id: str = "OnBase",
-        query_language: str = "onbase:DocumentQuery",
+        query_language: str | None = None,
         top_k: int | None = None,
         raise_on_error: bool = True,
         warn_on_error: bool = True,
