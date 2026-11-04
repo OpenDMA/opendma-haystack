@@ -15,3 +15,13 @@ def tutorial_endpoint() -> str:
         pytest.skip("OPENDMA_TUTORIAL_ENDPOINT is not set")
     assert endpoint
     return endpoint
+
+
+@pytest.fixture
+def alfresco_endpoint() -> str:
+    """Return the configured Alfresco OpenDMA endpoint or skip."""
+    endpoint = os.environ.get("OPENDMA_ALFRESCO_ENDPOINT")
+    if not endpoint:
+        pytest.skip("OPENDMA_ALFRESCO_ENDPOINT is not set")
+    assert endpoint
+    return endpoint

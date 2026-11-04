@@ -50,6 +50,14 @@ $env:OPENDMA_TUTORIAL_ENDPOINT = "http://localhost:8080/opendma"
 uv run pytest tests\integration
 ```
 
+Run the Alfresco-specific integration tests against an Alfresco OpenDMA
+endpoint with at least two sites:
+
+```powershell
+$env:OPENDMA_ALFRESCO_ENDPOINT = "http://localhost:7070/opendma/alf"
+uv run pytest tests\integration\test_alfresco_toolset.py
+```
+
 Lint, format, and type-check:
 
 ```bash

@@ -101,8 +101,42 @@ def test_alfresco_list_sites_tool_returns_error_for_unexpected_parameter() -> No
         "error": True,
         "tool": "alfresco_list_sites",
         "error_type": "ToolInputError",
-        "message": "Unexpected parameter(s): site. Allowed parameters: none.",
+        "message": "Unexpected parameter(s): site. Allowed parameters: continuation_token.",
     }
+
+
+def test_alfresco_list_sites_tool_accepts_continuation_token() -> None:
+    toolset = AlfrescoToolset(endpoint="http://localhost:8080/opendma")
+    list_sites_tool = next(tool for tool in toolset.get_tools() if tool.name == "alfresco_list_sites")
+
+    assert list_sites_tool.parameters["properties"]["continuation_token"] == {
+        "type": ["string", "null"],
+        "description": "Opaque continuation token returned by a previous call.",
+        "default": None,
+    }
+
+
+def test_alfresco_list_sites_tool_returns_error_for_invalid_continuation_token() -> None:
+    toolset = AlfrescoToolset(endpoint="http://localhost:8080/opendma")
+    list_sites_tool = next(tool for tool in toolset.get_tools() if tool.name == "alfresco_list_sites")
+
+    result = list_sites_tool.invoke(continuation_token="invalid")
+
+    assert result == {
+        "error": True,
+        "tool": "alfresco_list_sites",
+        "error_type": "ValueError",
+        "message": "Invalid continuation token",
+    }
+
+
+@pytest.mark.parametrize("site_page_size", [0, -1])
+def test_alfresco_toolset_rejects_non_positive_site_page_size(site_page_size: int) -> None:
+    with pytest.raises(ValueError, match="site_page_size must be greater than 0"):
+        AlfrescoToolset(
+            endpoint="http://localhost:8080/opendma",
+            site_page_size=site_page_size,
+        )
 
 
 def test_open_dma_toolset_encodes_and_decodes_offset_tokens() -> None:

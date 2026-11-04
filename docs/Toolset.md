@@ -260,6 +260,7 @@ toolset = AlfrescoToolset(
     password="admin",
     repository_id="Alfresco",
     text_extractor=text_extractor,
+    site_page_size=50,
 )
 
 tools_by_name = {tool.name: tool for tool in toolset.get_tools()}
@@ -269,6 +270,9 @@ The `endpoint` expects an OpenDMA REST service. The quickest way to map your
 Alfresco deployment to the OpenDMA data model and expose such an endpoint is
 to run the [ECI Server](https://github.com/xaldon/eci-server).
 It is available free of charge for non-production use.
+
+`site_page_size` controls how many sites `alfresco_list_sites` returns per call.
+It defaults to `50`.
 
 The search tool converts `full_text` into an Alfresco `TEXT` query. If
 `in_folder` is set, the search is restricted to direct children of that folder.
@@ -292,11 +296,13 @@ Lists Alfresco sites.
 
 Input:
 
-- No input parameters.
+- `continuation_token` optional string: token returned by a previous call.
 
 Output:
 
-- List of site descriptions.
+- `sites`: list of site descriptions.
+- `has_more`: whether more sites are available.
+- `continuation_token`: token for the next call when `has_more` is true.
 
 Each site description contains:
 
@@ -308,8 +314,14 @@ Each site description contains:
 Example:
 
 ```python
-sites = tools_by_name["alfresco_list_sites"].invoke()
-print(sites)
+page = tools_by_name["alfresco_list_sites"].invoke()
+print(page)
+
+if page["has_more"]:
+    next_page = tools_by_name["alfresco_list_sites"].invoke(
+        continuation_token=page["continuation_token"],
+    )
+    print(next_page)
 ```
 
 ## FileNetP8Toolset

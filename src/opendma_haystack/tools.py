@@ -104,6 +104,14 @@ class SiteDescription(BaseModel):
     root_folder_id: str
 
 
+class AlfrescoListSitesResult(BaseModel):
+    """Paged Alfresco site listing."""
+
+    sites: list[SiteDescription]
+    has_more: bool
+    continuation_token: str | None = None
+
+
 @dataclass
 class _ReadTextCacheEntry:
     created_at: float
@@ -967,7 +975,11 @@ class AlfrescoToolset(_SearchToolset):
         read_text_cache_ttl_seconds: int | None = 21600,
         read_text_chunk_chars: int = 4000,
         read_text_chunk_overlap: int = 200,
+        site_page_size: int = 50,
     ) -> None:
+        if site_page_size <= 0:
+            raise ValueError("site_page_size must be greater than 0")
+        self.site_page_size = site_page_size
         super().__init__(
             endpoint=endpoint,
             username=username,
@@ -992,25 +1004,40 @@ class AlfrescoToolset(_SearchToolset):
                 name="alfresco_list_sites",
                 description=(
                     "List Alfresco sites with short name, title, description, "
-                    "and root folder object ID."
+                    "and root folder object ID. Use continuation_token when "
+                    "has_more is true."
                 ),
-                parameters={"type": "object", "properties": {}},
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "continuation_token": {
+                            "type": ["string", "null"],
+                            "description": "Opaque continuation token returned by a previous call.",
+                            "default": None,
+                        },
+                    },
+                },
                 function=self.list_sites,
             ),
         ]
 
-    def list_sites(self, **kwargs: Any) -> list[dict[str, Any]] | dict[str, Any]:
+    def list_sites(
+        self,
+        continuation_token: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """Implementation for alfresco_list_sites."""
         try:
             input_error = self._validate_tool_input(
                 tool_name="alfresco_list_sites",
                 provided=kwargs,
                 required={},
-                allowed=set(),
+                allowed={"continuation_token"},
             )
             if input_error is not None:
                 return input_error
 
+            offset = self._decode_offset_token(continuation_token)
             session = self._create_session()
             try:
                 search_result = session.search(
@@ -1020,9 +1047,19 @@ class AlfrescoToolset(_SearchToolset):
                 )
 
                 sites: list[SiteDescription] = []
+                site_index = 0
+                has_more = False
                 for obj in search_result.get_objects():
                     if not isinstance(obj, OdmaFolder):
                         continue
+
+                    if site_index < offset:
+                        site_index += 1
+                        continue
+                    if len(sites) >= self.site_page_size:
+                        has_more = True
+                        break
+
                     sites.append(
                         SiteDescription(
                             short_name=self._metadata_string(obj, "alfresco:cm:name"),
@@ -1034,11 +1071,18 @@ class AlfrescoToolset(_SearchToolset):
                             root_folder_id=str(obj.get_id()),
                         )
                     )
-                return [site.model_dump() for site in sites]
+                    site_index += 1
+
+                next_offset = offset + len(sites)
+                return AlfrescoListSitesResult(
+                    sites=sites,
+                    has_more=has_more,
+                    continuation_token=self._encode_offset_token(next_offset) if has_more else None,
+                ).model_dump()
             finally:
                 session.close()
         except Exception as exc:
-            return [self._tool_error("alfresco_list_sites", exc)]
+            return self._tool_error("alfresco_list_sites", exc)
 
     def _search_tool_description(self) -> str:
         return (
